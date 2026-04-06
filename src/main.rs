@@ -1,28 +1,31 @@
-use std::{thread, time::Duration};
+mod adlx;
+mod ffi;
+mod gpu;
 
-unsafe extern "C" {
-    fn GetGPUUsage(index: i32) -> i32;
-}
+use crate::adlx::adlx::{get_gpu_names, init_adlx};
+use crate::gpu::amd::AmdGpu;
+use crate::gpu::interface::GpuMonitor;
 
 fn main() {
-    let mut usages: Vec<i32> = Vec::new();
-    let mut elapsed: u128 = 0;
-
-    loop {
-        let usage = unsafe { GetGPUUsage(1) };
-        usages.push(usage);
-
-        thread::sleep(Duration::from_millis(10));
-        elapsed += 10;
-
-        if elapsed >= 1000 {
-            if !usages.is_empty() {
-                let sum: i32 = usages.iter().sum();
-                println!("GPU Usage: {:.2}%", sum as f64 / usages.len() as f64);
-            }
-
-            usages.clear();
-            elapsed = 0;
+    match init_adlx() {
+        Ok(()) => {}
+        Err(err) => {
+            eprintln!("Failed to initialize ADLX: {}", err);
+            return;
         }
     }
+
+    let names = get_gpu_names();
+    if names.is_err() {
+        eprintln!("Failed to get GPU names: {}", names.unwrap_err());
+        return;
+    }
+
+    let names = names.unwrap();
+
+    for name in &names {
+        println!("{}", name);
+    }
+
+    let _ = AmdGpu::new(&names[1]);
 }

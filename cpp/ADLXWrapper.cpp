@@ -6,20 +6,13 @@
 using namespace adlx;
 
 static ADLXHelper adlxHelper = ADLXHelper();
-static bool adlxInitialized = false;
 
-static bool Init() {
-    if (!adlxInitialized)
-        adlxInitialized = ADLX_SUCCEEDED(adlxHelper.Initialize());
-
-    return adlxInitialized;
+extern "C" {
+int ADLX_Init() {
+    return ADLX_SUCCEEDED(adlxHelper.Initialize()) ? 0 : 1;
 }
 
-extern "C"
-int GetGPUUsage(const int index) {
-    if (!Init())
-        return -1;
-
+int ADLX_InitPerformanceService(void** res) {
     IADLXSystem* sysSvc = adlxHelper.GetSystemServices();
     if (!sysSvc)
         return -1;
@@ -28,25 +21,81 @@ int GetGPUUsage(const int index) {
     if (ADLX_FAILED(sysSvc->GetPerformanceMonitoringServices(&perfMonitor)))
         return -1;
 
+    *res = static_cast<void*>(perfMonitor);
+
+    return 0;
+}
+
+int ADLX_GetGPUNames(char*** resNames, int* resCount) {
+    IADLXSystem* sysSvc = adlxHelper.GetSystemServices();
+    if (!sysSvc)
+        return -1;
+
     IADLXGPUListPtr sysGPUs;
-    if (ADLX_FAILED(sysSvc->GetGPUs(&sysGPUs)))
+    if (ADLX_FAILED(sysSvc->GetGPUs(&sysGPUs)) || sysGPUs == nullptr)
         return -1;
 
-    IADLXGPUPtr sysGPU;
-    if (ADLX_FAILED(sysGPUs->At(index, &sysGPU)))
+    char** names = static_cast<char**>(malloc(sizeof(char*) * sysGPUs->Size()));
+    const int count = static_cast<int>(sysGPUs->Size());
+
+    for (int i = 0; i < count; i++) {
+        IADLXGPUPtr currGPU;
+        if (ADLX_FAILED(sysGPUs->At(i, &currGPU))) {
+            return -1;
+        }
+
+        const char* name = nullptr;
+        if (ADLX_FAILED(currGPU->Name(&name)) || name == nullptr) {
+            return -1;
+        }
+
+        names[i] = static_cast<char*>(malloc(sizeof(char) * (strlen(name) + 1)));
+        strcpy_s(names[i], strlen(name) + 1, name);
+    }
+
+    *resNames = names;
+    *resCount = count;
+
+    return 0;
+}
+
+int ADLX_FreeGPUNames(char** names, const int count) {
+    for (int i = 0; i < count; i++) {
+        free(names[i]);
+    }
+
+    free(names);
+
+    return 0;
+}
+
+int ADLX_GetGPU(void** res, const char* name) {
+    IADLXSystem* sysSvc = adlxHelper.GetSystemServices();
+    if (!sysSvc)
         return -1;
 
-    IADLXAllMetricsPtr allMetrics;
-    if (ADLX_FAILED(perfMonitor->GetCurrentAllMetrics(&allMetrics)))
+    IADLXGPUListPtr sysGPUs;
+    if (ADLX_FAILED(sysSvc->GetGPUs(&sysGPUs)) || sysGPUs == nullptr)
         return -1;
 
-    IADLXGPUMetricsPtr sysGPUMetrics;
-    if (ADLX_FAILED(allMetrics->GetGPUMetrics(sysGPU, &sysGPUMetrics)))
-        return -1;
+    for (int i = 0; i < sysGPUs->Size(); i++) {
+        IADLXGPUPtr currGPU;
+        if (ADLX_FAILED(sysGPUs->At(i, &currGPU))) {
+            return -1;
+        }
 
-    adlx_double sysGPUUsage = 0;
-    if (ADLX_FAILED(sysGPUMetrics->GPUUsage(&sysGPUUsage)))
-        return -1;
+        const char* currName = nullptr;
+        if (ADLX_FAILED(currGPU->Name(&currName)) || currName == nullptr) {
+            return -1;
+        }
 
-    return static_cast<int>(sysGPUUsage);
+        if (strcmp(currName, name) == 0) {
+            *res = static_cast<void*>(currGPU);
+
+            return 0;
+        }
+    }
+
+    return -1;
+}
 }
