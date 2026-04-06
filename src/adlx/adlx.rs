@@ -1,5 +1,5 @@
 use crate::adlx::adlx::ffi::{ADLX_FreeGPUNames, ADLX_GetGPUNames, ADLX_Init};
-use crate::ffi::strings::from_c_strings;
+use crate::c::strings::from_c_strings;
 use std::ffi::{c_char, c_int};
 use std::ptr::null_mut;
 

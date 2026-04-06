@@ -1,5 +1,5 @@
 use super::interface::GpuMonitor;
-use crate::ffi::strings::to_c_string;
+use crate::c::strings::to_c_string;
 use crate::gpu::amd::ffi::{ADLX_GetGPU, ADLX_InitPerformanceService};
 use std::ffi::c_void;
 use std::ptr::null_mut;

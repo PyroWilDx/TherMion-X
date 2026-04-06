@@ -1,5 +1,5 @@
 mod adlx;
-mod ffi;
+mod c;
 mod gpu;
 
 use crate::adlx::adlx::{get_gpu_names, init_adlx};
